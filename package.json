@@ -1,0 +1,16 @@
+{
+  "name": "theprowl",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Platon Korzh <platon@korzh.io>",
+  "license": "ISC",
+  "dependencies": {
+    "glob": "^5.0.14",
+    "parslets": "^1.0.4",
+    "toker": "^1.0.6"
+  }
+}
