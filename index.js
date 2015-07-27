@@ -6,12 +6,6 @@ var toker      = require('toker');
 var scss       = require('./scss');
 var lexOptions = { identifierStart: /[\.#@$_a-zA-Z]/, identifierPart: /([#$_a-zA-Z-]|[0-9])/, keywords: ['@mixin', '@include', '@extend'] };
 
-function tokens(pattern) {
-	return glob.sync(pattern, {}).reduce(function(prev, file) {
-		return prev.concat(new toker.LexicalAnalyzer(fs.readFileSync(file, 'utf8'), lexOptions).getTokens());
-	}, []);
-}
-
 function obsoleteMixins(t) {
 	return new parslets.TokenWrapper(t).consume(parslets.search(scss.mixin)).filter(function(token) {
 		return token.comment;
@@ -36,28 +30,25 @@ function obsoleteMixins(t) {
 	}, {});
 }
 
-function lint(parslets) {
-	var t = tokens('./*.scss'),
-		oMixins = obsoleteMixins(t),
-		includes = new parslets.TokenWrapper(t).consume(parslets.search(scss.include)).map(function(include) {
-			include.arguments = (include.arguments || []).map(function(curr) {
-				return curr.lexeme
-			});
-
-			return include;
+function obsoleteIncludes(tokens, mixins) {
+	var includes = new parslets.TokenWrapper(tokens).consume(parslets.search(scss.include)).map(function(include) {
+		include.arguments = (include.arguments || []).map(function(curr) {
+			return curr.lexeme
 		});
+
+		return include;
+	});
 
 	var blackList = [];
 
 	for (var i = includes.length - 1; i >= 0; i--) {
 		var include = includes[i],
-			mixin = oMixins[include.name];
+			mixin = mixins[include.name];
 
 		if (mixin) {
 			blackList.push.apply(blackList, mixin.selectors.map(function(sel) {
 				for (var i = include.arguments.length - 1; i >= 0; i--) {
 					var arg = include.arguments[i];
-					debugger;
 
 					sel = sel.replace('#{' + mixin.arguments[i].name + '}', arg);
 				};
@@ -66,6 +57,23 @@ function lint(parslets) {
 			}));
 		}
 	}
+
+	return blackList;
+}
+
+var lint = module.exports.lint = function(pattern) {
+	var blackList = [];
+
+	glob.sync(pattern, {}).forEach(function(file) {
+		var tokens = new toker.LexicalAnalyzer(fs.readFileSync(file, 'utf8'), lexOptions).getTokens(),
+			obj = obsoleteMixins(tokens);
+
+		if (Object.keys(obj).length !== 0) {
+			blackList.push.apply(blackList, [obsoleteIncludes(tokens, obj)]);
+		}
+
+		tokens = null;
+	});
 
 	return blackList;
 }
