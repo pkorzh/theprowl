@@ -19,12 +19,16 @@ function declaration() {
 
 	this.consume(':');
 
-	value = this.consume(function() {
-		return {
-			name: this.consume(':identifier'),
-			arguments: this.consume(parslets.actualArgs)
-		}
-	}, parslets.arith({postfixOps: ['px', 'em', '%', '!important']}));
+	 value = this.consume(parslets.sequence(function() {
+	  return this.consume(function() {
+	   return {
+	    name: this.consume(':identifier'),
+	    arguments: this.consume(parslets.actualArgs)
+	   }
+	  }, function() {
+	   return this.consume(parslets.arith({postfixOps: ['px', 'em', '%', '!important']}))
+	  })
+	 }));
 
 	this.consumeIf(';');
 	this.consumeIf(':comment');
