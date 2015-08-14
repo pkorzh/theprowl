@@ -1,14 +1,19 @@
 var parslets = require('parslets');
+var ast      = require('./ast');
 
-function content() {
-	return this.consume(include, parslets.sequence(declaration), ruleset);
-}
+var content = exports.content = function() {
+	return this.consume(include, mixin, parslets.sequence(declarations), ruleset);
+};
 
 function wrapper_content() {
 	this.consume('{');
 	var ret = this.consume(parslets.sequence(content));
 	this.consume('}');
 	return ret;
+}
+
+function declarations() {
+	return this.consume(declaration, extend);
 }
 
 function declaration() {
@@ -31,23 +36,17 @@ function declaration() {
 	 }));
 
 	this.consumeIf(';');
-	this.consumeIf(':comment');
 
-	return {
-		//type: 'declaration',
-		//name: name.lexeme,
-		//value: value
-	}
+	return {};
 }
 
 function ruleset() {
-	this.consumeIf(':comment');
+	var comment = this.consumeIf(comments);
 
-	return {
-		type: 'ruleset',
-		selector: this.consume(selector_tree),
-		body: this.consume(wrapper_content)
-	}
+	return new ast.Ruleset(this.consume(selector_tree), {
+		body: this.consume(wrapper_content),
+		comment: comment
+	});
 }
 
 function pseudo_selector() {
@@ -137,34 +136,48 @@ function selector_tree() {
 	return tree;
 }
 
-var mixin = module.exports.mixin = function() {
-	var comment = this.consumeIf(':comment');
+function mixin() {
+	var comment = this.consumeIf(comments);
 
 	this.consume('@mixin');
 
-	var ret =  {
-		type: 'mixin',
-		name: this.consume(':identifier').lexeme,
+	var ret = new ast.Mixin(this.consume(':identifier').lexeme, {
 		arguments: this.consumeIf(parslets.formalArgs),
 		body: this.consume(wrapper_content),
 		comment: comment
-	};
-
-
+	});
 
 	return ret;
-};
+}
 
-var include = module.exports.include = function() {
+var include = exports.include = function() {
+	var comment = this.consumeIf(comments);
+
 	this.consume('@include');
 
-	var ret = {
-		type: 'include',
-		name: this.consume(':identifier').lexeme,
-		arguments: this.consumeIf(parslets.actualArgs)
-	};
+	var ret = new ast.Include(this.consume(':identifier').lexeme, {
+		arguments: this.consumeIf(parslets.actualArgs),
+		body: this.consumeIf(wrapper_content)
+	});
 
 	this.consumeIf(';');
 
 	return ret;
-};
+}
+
+function extend() {
+	this.consume('@extend');
+
+	this.consume(':operator');
+	this.consume(':identifier');
+	
+	this.consumeIf(';');
+
+	return true;
+}
+
+function comments() {
+	return this.consume(parslets.sequence(':comment')).map(function(e) {
+		return e.lexeme
+	}).join('');
+}
